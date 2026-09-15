@@ -8,6 +8,7 @@ const fs = require('fs');
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(express.static('public'));
 
 let sock;
 let currentQR = '';
@@ -54,6 +55,31 @@ async function connectToWhatsApp() {
 
     sock.ev.on('creds.update', saveCreds);
 }
+
+// Rota de Login (substitui o PHP)
+app.post('/api/login', async (req, res) => {
+    const { email, senha } = req.body;
+    if (!email || !senha) {
+        return res.status(400).json({ success: false, error: 'E-mail e senha são obrigatórios.' });
+    }
+
+    try {
+        const token = 'Sapu2024AdmToken';
+        const apiUrl = `https://suportedksoft.com.br/sapu/adm/APILoginSapu.php?email=${encodeURIComponent(email)}&senha=${encodeURIComponent(senha)}&token=${token}`;
+        
+        const response = await fetch(apiUrl);
+        const data = await response.json();
+
+        if (data && data.status === 'success') {
+            res.json({ success: true });
+        } else {
+            res.status(401).json({ success: false, error: data.message || 'E-mail ou senha incorretos.' });
+        }
+    } catch (error) {
+        console.error('Erro no login:', error);
+        res.status(500).json({ success: false, error: 'Erro ao conectar na API de Login do SAPU.' });
+    }
+});
 
 // Retorna o status e o QR code
 app.get('/api/qr', (req, res) => {
