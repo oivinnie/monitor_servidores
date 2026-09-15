@@ -65,9 +65,21 @@ app.post('/api/login', async (req, res) => {
 
     try {
         const token = 'Sapu2024AdmToken';
-        const apiUrl = `https://suportedksoft.com.br/sapu/adm/APILoginSapu.php?email=${encodeURIComponent(email)}&senha=${encodeURIComponent(senha)}&token=${token}`;
+        const apiUrl = 'https://www.suportedksoft.com.br/sapu/adm/APILoginSapu.php';
         
-        const response = await fetch(apiUrl);
+        const formData = new URLSearchParams();
+        formData.append('email', email);
+        formData.append('senha', senha);
+        formData.append('token', token);
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData,
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            }
+        });
+        
         const data = await response.json();
 
         if (data && data.status === 'success') {
