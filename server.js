@@ -12,9 +12,19 @@ app.use(express.static('public'));
 
 // Cria o armazenamento em memória para guardar sessões de chaves de grupos (corrige "No sessions")
 const store = makeInMemoryStore({ logger: pino().child({ level: 'silent', stream: 'store' }) });
-store.readFromFile('./baileys_store.json');
+
+try {
+    store.readFromFile('./baileys_store.json');
+} catch (e) {
+    console.log('Nenhum banco de dados prévio encontrado ou arquivo corrompido, iniciando um novo.');
+}
+
 setInterval(() => {
-    store.writeToFile('./baileys_store.json');
+    try {
+        store.writeToFile('./baileys_store.json');
+    } catch (err) {
+        console.error('Erro ao salvar baileys_store:', err.message);
+    }
 }, 10_000);
 
 let sock;
