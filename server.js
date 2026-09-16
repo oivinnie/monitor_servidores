@@ -182,54 +182,68 @@ app.post('/api/logout', (req, res) => {
     }
 });
 
+// Retorna o último erro de webhook para debug
+app.get('/api/lasterror', (req, res) => {
+    try {
+        const error = fs.readFileSync('last_webhook_error.txt', 'utf8');
+        res.send(`<pre>${error}</pre>`);
+    } catch (e) {
+        res.send('Nenhum erro registrado.');
+    }
+});
+
 // Recebe o Webhook do Grafana
-app.post('/api/webhook', async (req, res) => {
+app.post('/api/webhook', (req, res) => {
     if (!isConnected) {
         return res.status(503).json({ error: 'WhatsApp not connected' });
     }
 
-    const payload = req.body;
-    
-    // Formata o alerta do Grafana
-    // Pode ser customizado dependendo de como o Grafana envia o payload
-    let title = payload.title || 'Alerta Grafana';
-    let messageBody = payload.message || '';
-    let state = payload.state || 'Alerting';
-    
-    const message = `🚨 *${title}* 🚨\nEstado: ${state}\n${messageBody}`;
-    
-    // O número deve ser passado pela querystring, ex: /api/webhook?number=5511999999999
-    // Se não passar, você pode definir um padrão aqui.
-    let targetNumber = req.query.number;
-    if (!targetNumber) {
-        return res.status(400).json({ error: 'Number query parameter is required. Example: ?number=5511999999999' });
-    }
-    
-    targetNumber = targetNumber.trim();
-    
-    // Verifica se já possui o sufixo de grupo (@g.us) ou usuário (@s.whatsapp.net)
-    if (!targetNumber.includes('@')) {
-        targetNumber = `${targetNumber}@s.whatsapp.net`;
-    }
+    // Responder ao Grafana IMEDIATAMENTE para evitar timeout (Erro 500 InternalError no Grafana)
+    res.json({ success: true, message: 'Webhook recebido, processando em segundo plano' });
 
-    try {
-        // Se for grupo, força o carregamento dos metadados para evitar erro de "No sessions"
-        if (targetNumber.includes('@g.us')) {
-            try {
-                await sock.groupMetadata(targetNumber);
-                // Dá um pequeno tempo para o store interno (makeInMemoryStore) processar os participantes
-                await new Promise(resolve => setTimeout(resolve, 1500));
-            } catch (metaErr) {
-                console.log('Metadados do grupo já carregados ou erro ignorado:', metaErr.message);
+    // Processar o envio em background
+    (async () => {
+        try {
+            const payload = req.body;
+            let title = payload.title || 'Alerta Grafana';
+            let messageBody = payload.message || '';
+            let state = payload.state || 'Alerting';
+            
+            const message = `🚨 *${title}* 🚨\nEstado: ${state}\n${messageBody}`;
+            
+            let targetNumber = req.query.number;
+            if (!targetNumber) return;
+            
+            targetNumber = targetNumber.trim();
+            if (!targetNumber.includes('@')) {
+                if (targetNumber.length > 15) {
+                    targetNumber = `${targetNumber}@g.us`;
+                } else {
+                    targetNumber = `${targetNumber}@s.whatsapp.net`;
+                }
             }
-        }
 
-        await sock.sendMessage(targetNumber, { text: message });
-        res.json({ success: true });
-    } catch (error) {
-        console.error('Error sending message:', error);
-        res.status(500).json({ error: 'Failed to send message', details: error.message || error.toString() });
-    }
+            // Se for grupo, força sincronização
+            if (targetNumber.includes('@g.us')) {
+                try {
+                    await sock.groupMetadata(targetNumber);
+                    await sock.presenceSubscribe(targetNumber); // Força inscrição de presença
+                    await new Promise(resolve => setTimeout(resolve, 2500)); // Tempo maior de respiro
+                } catch (metaErr) {
+                    console.log('Metadados do grupo erro:', metaErr.message);
+                }
+            }
+
+            await sock.sendMessage(targetNumber, { text: message });
+            // Sucesso! Limpa o log de erro se houver
+            if (fs.existsSync('last_webhook_error.txt')) {
+                fs.unlinkSync('last_webhook_error.txt');
+            }
+        } catch (error) {
+            console.error('Erro ao enviar mensagem em background:', error);
+            fs.writeFileSync('last_webhook_error.txt', `${new Date().toLocaleString()} - Erro: ${error.message}\n${error.stack}`);
+        }
+    })();
 });
 
 app.listen(3000, () => {
