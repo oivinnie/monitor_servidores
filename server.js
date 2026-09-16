@@ -169,6 +169,15 @@ app.post('/api/webhook', async (req, res) => {
     }
 
     try {
+        // Se for grupo, força o carregamento dos metadados para evitar erro de "No sessions"
+        if (targetNumber.includes('@g.us')) {
+            try {
+                await sock.groupMetadata(targetNumber);
+            } catch (metaErr) {
+                console.log('Metadados do grupo já carregados ou erro ignorado:', metaErr.message);
+            }
+        }
+
         await sock.sendMessage(targetNumber, { text: message });
         res.json({ success: true });
     } catch (error) {
