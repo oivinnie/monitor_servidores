@@ -81,8 +81,11 @@
             <p style="font-size: 14px; color: #666;">Configure esta URL no Grafana (Contact Points > Webhook):</p>
             <div class="webhook-info">
                 <strong>URL:</strong><br>
-                <span id="webhook-url" style="font-weight: bold; color: #2980b9;">http://SEU_DOMINIO/api/webhook?number=NUMERO_OU_GRUPO</span><br><br>
-                <em>* Selecione um grupo abaixo ou insira um número.</em>
+                <div style="display:flex; align-items: center; margin-top: 5px;">
+                    <span id="webhook-url" style="font-weight: bold; color: #2980b9; flex:1; word-break: break-all;">http://SEU_DOMINIO/api/webhook?number=NUMERO_OU_GRUPO</span>
+                    <button onclick="copyWebhook()" class="btn" style="background:#34495e; padding: 4px 8px; margin-left:10px; font-size:12px;">Copiar</button>
+                </div>
+                <em style="display:block; margin-top:10px;">* Selecione um grupo abaixo ou insira um número.</em>
             </div>
             
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
@@ -91,13 +94,14 @@
                 <h3>Selecionar Grupo</h3>
                 <p style="font-size: 14px; color: #666;">Escolha qual grupo receberá os alertas.</p>
                 <button onclick="loadGroups()" class="btn" style="display: block; width: 100%; text-align: center; background: #27ae60; margin-bottom: 10px;">Listar Meus Grupos</button>
+                <input type="text" id="search-group" placeholder="Pesquisar grupo..." style="display:none; width: 100%; padding: 8px; margin-bottom: 10px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;" onkeyup="filterGroups()" />
                 <div id="groups-list" style="max-height: 250px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 5px; border-radius: 4px; display: none; background: #fdfdfd;">
                     <!-- Grupos aparecerão aqui -->
                 </div>
             </div>
         </div>
         <div class="main-content">
-            <iframe src="https://broadpapaya3272.grafana.net/d-solo/vi9hgq5/monitoramento-servidor-marjorie-node-exporter?from=now-6h&to=now&timezone=browser&orgId=1&theme=light&panelId=panel-9" title="Grafana Dashboard" frameborder="0"></iframe>
+            <iframe src="https://broadpapaya3272.grafana.net/public-dashboards/17ca6c96b1c44651800aefb8ca4367b2?viewPanel=9" title="Grafana Dashboard" frameborder="0"></iframe>
         </div>
     </div>
 
@@ -210,8 +214,11 @@
             }
         }
 
+        let allGroups = [];
+
         async function loadGroups() {
             const listDiv = document.getElementById('groups-list');
+            const searchBox = document.getElementById('search-group');
             listDiv.style.display = 'block';
             listDiv.innerHTML = '<div style="text-align: center; padding: 10px;">Carregando...</div>';
             
@@ -220,16 +227,9 @@
                 const data = await res.json();
                 
                 if (data.groups && data.groups.length > 0) {
-                    let html = '';
-                    data.groups.forEach(g => {
-                        html += `
-                            <div style="border-bottom: 1px solid #eee; padding: 8px 0;">
-                                <strong style="color: #2c3e50;">${g.subject}</strong><br>
-                                <button onclick="selectGroup('${g.id}')" style="margin-top: 5px; padding: 4px 8px; font-size: 11px; background: #3498db; color: white; border: none; cursor: pointer; border-radius: 3px;">Selecionar</button>
-                            </div>
-                        `;
-                    });
-                    listDiv.innerHTML = html;
+                    allGroups = data.groups;
+                    searchBox.style.display = 'block';
+                    renderGroups(allGroups);
                 } else {
                     listDiv.innerHTML = '<div style="padding: 5px;">Nenhum grupo encontrado.</div>';
                 }
@@ -238,9 +238,49 @@
             }
         }
 
+        function renderGroups(groupsToRender) {
+            const listDiv = document.getElementById('groups-list');
+            if (groupsToRender.length === 0) {
+                listDiv.innerHTML = '<div style="padding: 5px;">Nenhum grupo corresponde à pesquisa.</div>';
+                return;
+            }
+            let html = '';
+            groupsToRender.forEach(g => {
+                html += `
+                    <div style="border-bottom: 1px solid #eee; padding: 8px 0;">
+                        <strong style="color: #2c3e50;">${g.subject}</strong><br>
+                        <button onclick="selectGroup('${g.id}')" style="margin-top: 5px; padding: 4px 8px; font-size: 11px; background: #3498db; color: white; border: none; cursor: pointer; border-radius: 3px;">Selecionar</button>
+                    </div>
+                `;
+            });
+            listDiv.innerHTML = html;
+        }
+
+        function filterGroups() {
+            const term = document.getElementById('search-group').value.toLowerCase();
+            const filtered = allGroups.filter(g => g.subject && g.subject.toLowerCase().includes(term));
+            renderGroups(filtered);
+        }
+
         function selectGroup(groupId) {
-            document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=' + encodeURIComponent(groupId);
-            alert('A URL do Webhook foi atualizada com o ID deste grupo!');
+            const url = window.location.origin + '/api/webhook?number=' + encodeURIComponent(groupId);
+            document.getElementById('webhook-url').innerText = url;
+            
+            // Copia para a área de transferência
+            navigator.clipboard.writeText(url).then(() => {
+                alert('A URL foi atualizada com o ID deste grupo e COPIADA para a área de transferência!');
+            }).catch(err => {
+                alert('URL atualizada! (Seu navegador bloqueou a cópia automática, use o botão Copiar)');
+            });
+        }
+        
+        function copyWebhook() {
+            const url = document.getElementById('webhook-url').innerText;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copiada para a área de transferência!');
+            }).catch(err => {
+                alert('Erro ao copiar URL.');
+            });
         }
 
         async function logoutWhatsApp() {
