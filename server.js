@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState, makeInMemoryStore } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
 const fs = require('fs');
@@ -9,6 +9,13 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
+
+// Cria o armazenamento em memória para guardar sessões de chaves de grupos (corrige "No sessions")
+const store = makeInMemoryStore({ logger: pino().child({ level: 'silent', stream: 'store' }) });
+store.readFromFile('./baileys_store.json');
+setInterval(() => {
+    store.writeToFile('./baileys_store.json');
+}, 10_000);
 
 let sock;
 let currentQR = '';
@@ -22,6 +29,8 @@ async function connectToWhatsApp() {
         printQRInTerminal: true,
         logger: pino({ level: 'silent' })
     });
+    
+    store.bind(sock.ev);
 
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
@@ -208,6 +217,8 @@ app.post('/api/webhook', async (req, res) => {
         if (targetNumber.includes('@g.us')) {
             try {
                 await sock.groupMetadata(targetNumber);
+                // Dá um pequeno tempo para o store interno (makeInMemoryStore) processar os participantes
+                await new Promise(resolve => setTimeout(resolve, 1500));
             } catch (metaErr) {
                 console.log('Metadados do grupo já carregados ou erro ignorado:', metaErr.message);
             }
