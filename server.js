@@ -27,7 +27,8 @@ async function connectToWhatsApp() {
     sock = makeWASocket({
         auth: state,
         printQRInTerminal: true,
-        logger: pino({ level: 'silent' })
+        logger: pino({ level: 'silent' }),
+        cachedGroupMetadata: async (jid) => store.fetchGroupMetadata(jid, sock)
     });
     
     store.bind(sock.ev);
