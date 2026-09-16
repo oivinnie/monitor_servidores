@@ -127,6 +127,39 @@ app.get('/api/grupos', async (req, res) => {
     }
 });
 
+// Proxy para consultar/adicionar servidores no SAPU
+app.post('/api/servidores', async (req, res) => {
+    const { acao, provedor, regiao, nome, ip } = req.body;
+    
+    try {
+        const token = 'Sapu2024AdmToken';
+        const apiUrl = 'https://www.suportedksoft.com.br/sapu/adm/acoes/api_servidores.php';
+        
+        const formData = new URLSearchParams();
+        formData.append('token', token);
+        formData.append('acao', acao || 'listar');
+        
+        if (acao === 'adicionar') {
+            formData.append('provedor', provedor);
+            formData.append('regiao', regiao);
+            formData.append('nome', nome);
+            formData.append('ip', ip);
+        }
+
+        const response = await fetch(apiUrl, {
+            method: 'POST',
+            body: formData,
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
+        });
+        
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('Erro na API de servidores:', error);
+        res.status(500).json({ status: 'error', message: 'Falha na comunicação com a API' });
+    }
+});
+
 // Desconectar o WhatsApp
 app.post('/api/logout', (req, res) => {
     if (sock) {
