@@ -96,7 +96,12 @@ app.post('/api/login', async (req, res) => {
 // Retorna o status e o QR code
 app.get('/api/qr', (req, res) => {
     if (isConnected) {
-        res.json({ status: 'connected', qr: null });
+        let connectedNumber = '';
+        if (sock && sock.user && sock.user.id) {
+            // Remove o sufixo e possíveis : device IDs
+            connectedNumber = sock.user.id.split(':')[0].split('@')[0];
+        }
+        res.json({ status: 'connected', qr: null, user: connectedNumber });
     } else if (currentQR) {
         res.json({ status: 'pending', qr: currentQR });
     } else {

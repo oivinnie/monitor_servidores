@@ -81,15 +81,20 @@
             <p style="font-size: 14px; color: #666;">Configure esta URL no Grafana (Contact Points > Webhook):</p>
             <div class="webhook-info">
                 <strong>URL:</strong><br>
-                <span id="webhook-url">http://SEU_DOMINIO/api/webhook?number=5511999999999</span><br><br>
-                <em>* Substitua o número pelo telefone que receberá as mensagens (com DDI e DDD).</em>
+                <span id="webhook-url" style="font-weight: bold; color: #2980b9;">http://SEU_DOMINIO/api/webhook?number=NUMERO_OU_GRUPO</span><br><br>
+                <em>* Selecione um grupo abaixo ou insira um número.</em>
             </div>
             
             <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
             
-            <h3>Ver Grupos</h3>
-            <p style="font-size: 14px; color: #666;">Descubra os IDs dos grupos em que o seu WhatsApp está.</p>
-            <a href="/api/grupos" target="_blank" class="btn" style="display: block; text-align: center; background: #27ae60;">Listar Grupos do WhatsApp</a>
+            <div id="groups-section" style="display:none;">
+                <h3>Selecionar Grupo</h3>
+                <p style="font-size: 14px; color: #666;">Escolha qual grupo receberá os alertas.</p>
+                <button onclick="loadGroups()" class="btn" style="display: block; width: 100%; text-align: center; background: #27ae60; margin-bottom: 10px;">Listar Meus Grupos</button>
+                <div id="groups-list" style="max-height: 250px; overflow-y: auto; font-size: 13px; border: 1px solid #eee; padding: 5px; border-radius: 4px; display: none; background: #fdfdfd;">
+                    <!-- Grupos aparecerão aqui -->
+                </div>
+            </div>
         </div>
         <div class="main-content">
             <iframe src="https://broadpapaya3272.grafana.net/d-solo/vi9hgq5/monitoramento-servidor-marjorie-node-exporter?from=now-6h&to=now&timezone=browser&orgId=1&theme=light&panelId=panel-9" title="Grafana Dashboard" frameborder="0"></iframe>
@@ -101,7 +106,7 @@
         const API_BASE = window.location.origin + '/api'; 
         
         // Atualiza a instrução visual com o domínio correto
-        document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=5511999999999';
+        document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=SEU_NUMERO_OU_GRUPO';
 
         let pollingInterval = null;
 
@@ -173,26 +178,69 @@
 
                 if (data.status === 'connected') {
                     qrImage.style.display = 'none';
-                    statusText.innerText = '✅ WhatsApp Conectado!';
+                    
+                    let connectedText = '✅ WhatsApp Conectado!';
+                    if (data.user) {
+                        connectedText += `<br><span style="font-size: 13px; font-weight: normal; margin-top: 5px; display: inline-block;">📱 Número: ${data.user}</span>`;
+                    }
+                    
+                    statusText.innerHTML = connectedText;
                     statusText.style.color = '#27ae60';
                     logoutBtn.style.display = 'block';
+                    document.getElementById('groups-section').style.display = 'block';
                 } else if (data.status === 'pending' && data.qr) {
                     qrImage.src = data.qr;
                     qrImage.style.display = 'inline-block';
                     statusText.innerText = 'Aguardando leitura do QR Code...';
                     statusText.style.color = '#f39c12';
                     logoutBtn.style.display = 'none';
+                    document.getElementById('groups-section').style.display = 'none';
                 } else {
                     qrImage.style.display = 'none';
                     statusText.innerText = 'Inicializando serviço...';
                     statusText.style.color = '#7f8c8d';
                     logoutBtn.style.display = 'none';
+                    document.getElementById('groups-section').style.display = 'none';
                 }
             } catch (err) {
                 console.error(err);
                 document.getElementById('status-text').innerText = 'Serviço do WhatsApp offline.';
                 document.getElementById('status-text').style.color = '#c0392b';
+                document.getElementById('groups-section').style.display = 'none';
             }
+        }
+
+        async function loadGroups() {
+            const listDiv = document.getElementById('groups-list');
+            listDiv.style.display = 'block';
+            listDiv.innerHTML = '<div style="text-align: center; padding: 10px;">Carregando...</div>';
+            
+            try {
+                const res = await fetch(`${API_BASE}/grupos`);
+                const data = await res.json();
+                
+                if (data.groups && data.groups.length > 0) {
+                    let html = '';
+                    data.groups.forEach(g => {
+                        html += `
+                            <div style="border-bottom: 1px solid #eee; padding: 8px 0;">
+                                <strong style="color: #2c3e50;">${g.subject}</strong><br>
+                                <button onclick="selectGroup('${g.id}')" style="margin-top: 5px; padding: 4px 8px; font-size: 11px; background: #3498db; color: white; border: none; cursor: pointer; border-radius: 3px;">Selecionar</button>
+                            </div>
+                        `;
+                    });
+                    listDiv.innerHTML = html;
+                } else {
+                    listDiv.innerHTML = '<div style="padding: 5px;">Nenhum grupo encontrado.</div>';
+                }
+            } catch (err) {
+                listDiv.innerHTML = '<div style="padding: 5px; color: red;">Erro ao carregar grupos.</div>';
+            }
+        }
+
+        function selectGroup(groupId) {
+            document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=' + groupId;
+            alert('A URL do Webhook foi atualizada com o ID deste grupo!');
         }
 
         async function logoutWhatsApp() {
