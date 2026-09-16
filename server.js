@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const { makeWASocket, useMultiFileAuthState, makeInMemoryStore } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys');
 const pino = require('pino');
 const QRCode = require('qrcode');
 const fs = require('fs');
@@ -9,23 +9,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use(express.static('public'));
-
-// Cria o armazenamento em memória para guardar sessões de chaves de grupos (corrige "No sessions")
-const store = makeInMemoryStore({ logger: pino().child({ level: 'silent', stream: 'store' }) });
-
-try {
-    store.readFromFile('./baileys_store.json');
-} catch (e) {
-    console.log('Nenhum banco de dados prévio encontrado ou arquivo corrompido, iniciando um novo.');
-}
-
-setInterval(() => {
-    try {
-        store.writeToFile('./baileys_store.json');
-    } catch (err) {
-        console.error('Erro ao salvar baileys_store:', err.message);
-    }
-}, 10_000);
 
 let sock;
 let currentQR = '';
@@ -37,30 +20,24 @@ async function connectToWhatsApp() {
     sock = makeWASocket({
         auth: state,
         printQRInTerminal: true,
-        logger: pino({ level: 'silent' }),
-        cachedGroupMetadata: async (jid) => store.fetchGroupMetadata(jid, sock)
+        logger: pino({ level: 'silent' })
     });
     
-    store.bind(sock.ev);
+    sock.ev.on('creds.update', saveCreds);
 
     sock.ev.on('connection.update', async (update) => {
         const { connection, lastDisconnect, qr } = update;
         
         if (qr) {
             currentQR = await QRCode.toDataURL(qr);
-            isConnected = false;
         }
 
         if (connection === 'close') {
-            isConnected = false;
-            currentQR = '';
-            const shouldReconnect = (lastDisconnect.error)?.output?.statusCode !== 401;
+            const shouldReconnect = lastDisconnect.error?.output?.statusCode !== 401;
             if (shouldReconnect) {
-                console.log('Reconnecting...');
                 connectToWhatsApp();
             } else {
                 console.log('Connection closed. You are logged out.');
-                // Delete auth_info_baileys folder so it can generate a new QR
                 if (fs.existsSync('auth_info_baileys')) {
                     fs.rmSync('auth_info_baileys', { recursive: true, force: true });
                 }
@@ -69,18 +46,26 @@ async function connectToWhatsApp() {
         } else if (connection === 'open') {
             isConnected = true;
             currentQR = '';
-            console.log('WhatsApp connected!');
         }
     });
-
-    sock.ev.on('creds.update', saveCreds);
 }
 
-// Rota de Login (substitui o PHP)
+connectToWhatsApp();
+
+app.get('/api/qr', (req, res) => {
+    if (isConnected) {
+        res.json({ status: 'connected', user: sock?.user?.id });
+    } else if (currentQR) {
+        res.json({ status: 'pending', qr: currentQR });
+    } else {
+        res.json({ status: 'initializing' });
+    }
+});
+
 app.post('/api/login', async (req, res) => {
     const { email, senha } = req.body;
     if (!email || !senha) {
-        return res.status(400).json({ success: false, error: 'E-mail e senha são obrigatórios.' });
+        return res.status(400).json({ success: false, error: 'E-mail e senha so obrigatrios.' });
     }
 
     try {
@@ -92,44 +77,36 @@ app.post('/api/login', async (req, res) => {
         formData.append('senha', senha);
         formData.append('token', token);
 
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            body: formData,
-            headers: {
-                'Content-Type': 'application/x-www-form-urlencoded'
-            }
-        });
-        
-        const data = await response.json();
+        const response = await fetch(apiUrl, { method: 'POST', body: formData });
+        const text = await response.text();
 
-        if (data && data.status === 'success') {
-            res.json({ success: true });
+        if (text.includes('1')) {
+            res.json({ success: true, email });
         } else {
-            res.status(401).json({ success: false, error: data.message || 'E-mail ou senha incorretos.' });
+            res.json({ success: false, error: 'Credenciais invlidas' });
         }
-    } catch (error) {
-        console.error('Erro no login:', error);
-        res.status(500).json({ success: false, error: 'Erro ao conectar na API de Login do SAPU.' });
+    } catch (err) {
+        res.status(500).json({ success: false, error: 'Erro de conexo.' });
     }
 });
 
-// Retorna o status e o QR code
-app.get('/api/qr', (req, res) => {
-    if (isConnected) {
-        let connectedNumber = '';
-        if (sock && sock.user && sock.user.id) {
-            // Remove o sufixo e possíveis : device IDs
-            connectedNumber = sock.user.id.split(':')[0].split('@')[0];
-        }
-        res.json({ status: 'connected', qr: null, user: connectedNumber });
-    } else if (currentQR) {
-        res.json({ status: 'pending', qr: currentQR });
-    } else {
-        res.json({ status: 'initializing', qr: null });
+app.post('/api/servidores', async (req, res) => {
+    const payload = req.body;
+    payload.token = 'Sapu2024AdmToken';
+
+    try {
+        const response = await fetch('https://www.suportedksoft.com.br/sapu/adm/acoes/api_servidores.php', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        const data = await response.json();
+        res.json(data);
+    } catch (err) {
+        res.status(500).json({ error: 'Erro de conexo com servidor SAPU' });
     }
 });
 
-// Retorna os grupos que o WhatsApp participa (para descobrir o ID do grupo)
 app.get('/api/grupos', async (req, res) => {
     if (!isConnected || !sock) {
         return res.status(503).json({ error: 'WhatsApp not connected' });
@@ -141,48 +118,11 @@ app.get('/api/grupos', async (req, res) => {
             subject: group.subject
         }));
         res.json({ groups });
-    } catch (error) {
-        console.error('Error fetching groups:', error);
-        res.status(500).json({ error: 'Failed to fetch groups' });
+    } catch (err) {
+        res.status(500).json({ error: 'Failed to fetch groups', details: err.message });
     }
 });
 
-// Proxy para consultar/adicionar servidores no SAPU
-app.post('/api/servidores', async (req, res) => {
-    const { acao, provedor, regiao, nome, ip, link_grafana } = req.body;
-    
-    try {
-        const token = 'Sapu2024AdmToken';
-        const apiUrl = 'https://www.suportedksoft.com.br/sapu/adm/acoes/api_servidores.php';
-        
-        const formData = new URLSearchParams();
-        formData.append('token', token);
-        formData.append('acao', acao || 'listar');
-        
-        if (acao === 'adicionar' || acao === 'editar') {
-            formData.append('provedor', provedor);
-            formData.append('regiao', regiao);
-            formData.append('nome', nome);
-            formData.append('ip', ip);
-            if (req.body.nome_antigo) formData.append('nome_antigo', req.body.nome_antigo);
-            if (req.body.link_grafana) formData.append('link_grafana', req.body.link_grafana);
-        }
-
-        const response = await fetch(apiUrl, {
-            method: 'POST',
-            body: formData,
-            headers: { 'Content-Type': 'application/x-www-form-urlencoded' }
-        });
-        
-        const data = await response.json();
-        res.json(data);
-    } catch (error) {
-        console.error('Erro na API de servidores:', error);
-        res.status(500).json({ status: 'error', message: 'Falha na comunicação com a API' });
-    }
-});
-
-// Desconectar o WhatsApp
 app.post('/api/logout', (req, res) => {
     if (sock) {
         sock.logout();
@@ -193,72 +133,42 @@ app.post('/api/logout', (req, res) => {
     }
 });
 
-// Retorna o último erro de webhook para debug
-app.get('/api/lasterror', (req, res) => {
-    try {
-        const error = fs.readFileSync('last_webhook_error.txt', 'utf8');
-        res.send(`<pre>${error}</pre>`);
-    } catch (e) {
-        res.send('Nenhum erro registrado.');
-    }
-});
-
-// Recebe o Webhook do Grafana
-app.post('/api/webhook', (req, res) => {
+app.post('/api/webhook', async (req, res) => {
     if (!isConnected) {
         return res.status(503).json({ error: 'WhatsApp not connected' });
     }
 
-    // Responder ao Grafana IMEDIATAMENTE para evitar timeout (Erro 500 InternalError no Grafana)
-    res.json({ success: true, message: 'Webhook recebido, processando em segundo plano' });
+    const payload = req.body;
+    let title = payload.title || 'Alerta Grafana';
+    let messageBody = payload.message || '';
+    let state = payload.state || 'Alerting';
+    
+    const message = `🚨 *${title}* 🚨\nEstado: ${state}\n${messageBody}`;
+    
+    let targetNumber = req.query.number;
+    if (!targetNumber) {
+        return res.status(400).json({ error: 'Number query parameter is required.' });
+    }
+    
+    targetNumber = targetNumber.trim();
+    if (!targetNumber.includes('@')) {
+        targetNumber = targetNumber.length > 15 ? `${targetNumber}@g.us` : `${targetNumber}@s.whatsapp.net`;
+    }
 
-    // Processar o envio em background
-    (async () => {
-        try {
-            const payload = req.body;
-            let title = payload.title || 'Alerta Grafana';
-            let messageBody = payload.message || '';
-            let state = payload.state || 'Alerting';
-            
-            const message = `🚨 *${title}* 🚨\nEstado: ${state}\n${messageBody}`;
-            
-            let targetNumber = req.query.number;
-            if (!targetNumber) return;
-            
-            targetNumber = targetNumber.trim();
-            if (!targetNumber.includes('@')) {
-                if (targetNumber.length > 15) {
-                    targetNumber = `${targetNumber}@g.us`;
-                } else {
-                    targetNumber = `${targetNumber}@s.whatsapp.net`;
-                }
-            }
-
-            // Se for grupo, força sincronização
-            if (targetNumber.includes('@g.us')) {
-                try {
-                    await sock.groupMetadata(targetNumber);
-                    await sock.presenceSubscribe(targetNumber); // Força inscrição de presença
-                    await new Promise(resolve => setTimeout(resolve, 2500)); // Tempo maior de respiro
-                } catch (metaErr) {
-                    console.log('Metadados do grupo erro:', metaErr.message);
-                }
-            }
-
-            await sock.sendMessage(targetNumber, { text: message });
-            // Sucesso! Limpa o log de erro se houver
-            if (fs.existsSync('last_webhook_error.txt')) {
-                fs.unlinkSync('last_webhook_error.txt');
-            }
-        } catch (error) {
-            console.error('Erro ao enviar mensagem em background:', error);
-            const target = req.query.number ? req.query.number.trim() : 'N/A';
-            fs.writeFileSync('last_webhook_error.txt', `${new Date().toLocaleString()} - Erro no alvo ${target}\nErro: ${error.message}\n${error.stack}`);
+    try {
+        // Se for grupo, ignora erros de fetch metadata
+        if (targetNumber.includes('@g.us')) {
+            try {
+                await sock.groupMetadata(targetNumber);
+            } catch (metaErr) {}
         }
-    })();
+        await sock.sendMessage(targetNumber, { text: message });
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ error: 'Failed to send message', details: error.message || error.toString() });
+    }
 });
 
 app.listen(3000, () => {
-    console.log('Server running on port 3000');
-    connectToWhatsApp();
+    console.log('API Server running on port 3000');
 });
