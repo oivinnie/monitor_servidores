@@ -161,6 +161,8 @@ app.post('/api/webhook', async (req, res) => {
         return res.status(400).json({ error: 'Number query parameter is required. Example: ?number=5511999999999' });
     }
     
+    targetNumber = targetNumber.trim();
+    
     // Verifica se já possui o sufixo de grupo (@g.us) ou usuário (@s.whatsapp.net)
     if (!targetNumber.includes('@')) {
         targetNumber = `${targetNumber}@s.whatsapp.net`;
@@ -171,7 +173,7 @@ app.post('/api/webhook', async (req, res) => {
         res.json({ success: true });
     } catch (error) {
         console.error('Error sending message:', error);
-        res.status(500).json({ error: 'Failed to send message' });
+        res.status(500).json({ error: 'Failed to send message', details: error.message || error.toString() });
     }
 });
 
