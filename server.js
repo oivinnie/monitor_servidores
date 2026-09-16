@@ -104,6 +104,24 @@ app.get('/api/qr', (req, res) => {
     }
 });
 
+// Retorna os grupos que o WhatsApp participa (para descobrir o ID do grupo)
+app.get('/api/grupos', async (req, res) => {
+    if (!isConnected || !sock) {
+        return res.status(503).json({ error: 'WhatsApp not connected' });
+    }
+    try {
+        const chats = await sock.groupFetchAllParticipating();
+        const groups = Object.values(chats).map(group => ({
+            id: group.id,
+            subject: group.subject
+        }));
+        res.json({ groups });
+    } catch (error) {
+        console.error('Error fetching groups:', error);
+        res.status(500).json({ error: 'Failed to fetch groups' });
+    }
+});
+
 // Desconectar o WhatsApp
 app.post('/api/logout', (req, res) => {
     if (sock) {
@@ -138,9 +156,11 @@ app.post('/api/webhook', async (req, res) => {
         return res.status(400).json({ error: 'Number query parameter is required. Example: ?number=5511999999999' });
     }
     
-    // Formata o número para o padrão do Baileys
-    targetNumber = targetNumber.includes('@s.whatsapp.net') ? targetNumber : `${targetNumber}@s.whatsapp.net`;
-    
+    // Verifica se já possui o sufixo de grupo (@g.us) ou usuário (@s.whatsapp.net)
+    if (!targetNumber.includes('@')) {
+        targetNumber = `${targetNumber}@s.whatsapp.net`;
+    }
+
     try {
         await sock.sendMessage(targetNumber, { text: message });
         res.json({ success: true });
