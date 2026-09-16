@@ -100,8 +100,13 @@
                 </div>
             </div>
         </div>
-        <div class="main-content">
-            <iframe src="https://broadpapaya3272.grafana.net/public-dashboards/17ca6c96b1c44651800aefb8ca4367b2?viewPanel=9" title="Grafana Dashboard" frameborder="0"></iframe>
+        <div class="main-content" style="display:flex; flex-direction:column; padding: 20px;">
+            <div style="background: #fcf8e3; padding: 15px; border-radius: 6px; border: 1px solid #faebcc; color: #8a6d3b; margin-bottom: 20px;">
+                <strong style="display:block; margin-bottom: 5px;">Seu Grafana bloqueou a exibição aqui dentro!</strong>
+                <p style="margin: 0 0 10px 0; font-size: 14px;">O Grafana tem uma proteção nativa que recusa a conexão quando tentamos exibi-lo dentro de outra página (iframe). Para liberar, você precisaria ativar <code>allow_embedding = true</code> nas configurações do seu Grafana Cloud.</p>
+                <a href="https://broadpapaya3272.grafana.net/public-dashboards/17ca6c96b1c44651800aefb8ca4367b2?drow=Vis%25C3%25A3o-geral" target="_blank" class="btn" style="background: #f39c12; color: #fff; text-decoration: none; display: inline-block;">Abrir Painel em Nova Aba</a>
+            </div>
+            <iframe src="https://broadpapaya3272.grafana.net/public-dashboards/17ca6c96b1c44651800aefb8ca4367b2?viewPanel=9" title="Grafana Dashboard" frameborder="0" style="flex:1; width:100%; border: 1px solid #ccc; border-radius: 4px;"></iframe>
         </div>
     </div>
 
@@ -265,6 +270,7 @@
         function selectGroup(groupId) {
             const url = window.location.origin + '/api/webhook?number=' + encodeURIComponent(groupId);
             document.getElementById('webhook-url').innerText = url;
+            localStorage.setItem('sapu_group_id', groupId);
             
             // Copia para a área de transferência
             navigator.clipboard.writeText(url).then(() => {
@@ -295,6 +301,10 @@
         }
 
         // Init
+        const savedGroupId = localStorage.getItem('sapu_group_id');
+        if (savedGroupId) {
+            document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=' + encodeURIComponent(savedGroupId);
+        }
         checkAuthState();
     </script>
 </body>
