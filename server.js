@@ -241,7 +241,8 @@ app.post('/api/webhook', (req, res) => {
             }
         } catch (error) {
             console.error('Erro ao enviar mensagem em background:', error);
-            fs.writeFileSync('last_webhook_error.txt', `${new Date().toLocaleString()} - Erro: ${error.message}\n${error.stack}`);
+            const target = req.query.number ? req.query.number.trim() : 'N/A';
+            fs.writeFileSync('last_webhook_error.txt', `${new Date().toLocaleString()} - Erro no alvo ${target}\nErro: ${error.message}\n${error.stack}`);
         }
     })();
 });
