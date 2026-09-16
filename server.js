@@ -139,12 +139,13 @@ app.post('/api/servidores', async (req, res) => {
         formData.append('token', token);
         formData.append('acao', acao || 'listar');
         
-        if (acao === 'adicionar') {
+        if (acao === 'adicionar' || acao === 'editar') {
             formData.append('provedor', provedor);
             formData.append('regiao', regiao);
             formData.append('nome', nome);
             formData.append('ip', ip);
-            if (link_grafana) formData.append('link_grafana', link_grafana);
+            if (req.body.nome_antigo) formData.append('nome_antigo', req.body.nome_antigo);
+            if (req.body.link_grafana) formData.append('link_grafana', req.body.link_grafana);
         }
 
         const response = await fetch(apiUrl, {
