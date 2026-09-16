@@ -129,7 +129,7 @@ app.get('/api/grupos', async (req, res) => {
 
 // Proxy para consultar/adicionar servidores no SAPU
 app.post('/api/servidores', async (req, res) => {
-    const { acao, provedor, regiao, nome, ip } = req.body;
+    const { acao, provedor, regiao, nome, ip, link_grafana } = req.body;
     
     try {
         const token = 'Sapu2024AdmToken';
@@ -144,6 +144,7 @@ app.post('/api/servidores', async (req, res) => {
             formData.append('regiao', regiao);
             formData.append('nome', nome);
             formData.append('ip', ip);
+            if (link_grafana) formData.append('link_grafana', link_grafana);
         }
 
         const response = await fetch(apiUrl, {

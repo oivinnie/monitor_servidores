@@ -136,6 +136,10 @@
                     <label>Endereço IP</label>
                     <input type="text" id="srv-ip" required placeholder="Ex: 200.150.193.10">
                 </div>
+                <div class="form-group">
+                    <label>Link do Grafana (Opcional)</label>
+                    <input type="url" id="srv-link" placeholder="Ex: https://...grafana.net/public-dashboards/...">
+                </div>
                 <div style="display:flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                     <button type="button" onclick="document.getElementById('modal-add-server').style.display='none'" class="btn" style="background:#95a5a6;">Cancelar</button>
                     <button type="submit" class="btn" style="background:#27ae60;" id="btn-salvar-srv">Salvar no SAPU</button>
@@ -198,25 +202,43 @@
         function renderServers(data) {
             const container = document.getElementById('servers-container');
             container.innerHTML = '';
+            // Ajustar o background global
+            container.parentElement.style.backgroundColor = '#1e1e1e';
+            container.parentElement.style.color = '#e0e0e0';
             
             for (const provedor in data) {
                 const providerDiv = document.createElement('div');
-                providerDiv.innerHTML = `<h3 style="margin-bottom: 10px; color: #2980b9; border-bottom: 2px solid #bdc3c7; padding-bottom: 5px;">${provedor}</h3>`;
+                providerDiv.innerHTML = `<h3 style="margin-bottom: 20px; color: #fff; font-size: 20px; font-weight: normal; border-bottom: 1px solid #333; padding-bottom: 10px;">${provedor}</h3>`;
                 
                 const grid = document.createElement('div');
                 grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 1fr))';
+                grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(220px, 1fr))';
                 grid.style.gap = '15px';
+                grid.style.marginBottom = '30px';
 
                 for (const regiao in data[provedor]) {
+                    const count = data[provedor][regiao].length;
+                    
+                    // Cabeçalho da região (ex: NO 145 ativos)
+                    const regionTitle = document.createElement('div');
+                    regionTitle.style.gridColumn = '1 / -1';
+                    regionTitle.style.marginTop = '10px';
+                    regionTitle.innerHTML = `<strong style="color:#fff; font-size:14px; margin-right: 15px;">${regiao}</strong><span style="color:#888; font-size:12px;">${count} servidores</span>`;
+                    grid.appendChild(regionTitle);
+
                     data[provedor][regiao].forEach(srv => {
+                        const linkGrafanaHTML = srv.link_grafana 
+                            ? `<a href="${srv.link_grafana}" target="_blank" style="color: #27ae60; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px;"><span style="font-size:16px;">📊</span> Abrir Painel</a>` 
+                            : `<span style="color: #555; display: flex; align-items: center; justify-content: center; gap: 5px;"><span style="font-size:16px;">📊</span> Sem link</span>`;
+                        
                         grid.innerHTML += `
-                            <div style="background: white; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.1); padding: 15px; border-top: 4px solid #27ae60;">
-                                <div style="font-size: 11px; color: #7f8c8d; text-transform: uppercase; font-weight: bold;">${regiao}</div>
-                                <div style="font-size: 18px; font-weight: bold; color: #2c3e50; margin: 5px 0;">${srv.nome}</div>
-                                <div style="font-size: 13px; color: #34495e; display: flex; align-items: center;">
-                                    <span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#27ae60; margin-right:5px;"></span>
-                                    ${srv.ip}
+                            <div style="background: #15181a; border: 1px solid #243b55; border-radius: 4px; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 150px; font-family: Arial, sans-serif;">
+                                <div>
+                                    <div style="font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 20px;">${srv.nome}</div>
+                                    <div style="font-size: 13px; color: #aaa; margin-bottom: 15px;">${srv.ip}</div>
+                                </div>
+                                <div style="font-size: 13px; font-weight: bold; padding-top: 15px;">
+                                    ${linkGrafanaHTML}
                                 </div>
                             </div>
                         `;
@@ -239,7 +261,8 @@
                 provedor: document.getElementById('srv-provedor').value,
                 regiao: document.getElementById('srv-regiao').value,
                 nome: document.getElementById('srv-nome').value,
-                ip: document.getElementById('srv-ip').value
+                ip: document.getElementById('srv-ip').value,
+                link_grafana: document.getElementById('srv-link').value
             };
 
             try {
