@@ -152,18 +152,13 @@
     </div>
     
     <script>
-        // Adapta dinamicamente à URL onde está hospedado
         const API_BASE = window.location.origin + '/api'; 
-        
-        // Atualiza a instrução visual com o domínio correto
         document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=SEU_NUMERO_OU_GRUPO';
-
         let pollingInterval = null;
 
-        // Verifica estado de autenticação Node
         async function checkAuthState() {
             try {
-                const res = await fetch(`${API_BASE}/qr`);
+                const res = await fetch(API_BASE + '/qr');
                 const data = await res.json();
                 const userEmail = localStorage.getItem('sapu_email');
                 
@@ -173,7 +168,6 @@
                     document.getElementById('user-info').style.display = 'block';
                     document.getElementById('user-email').innerText = userEmail;
                     
-                    // Inicia o checkQR e Servidores
                     checkQR();
                     pollingInterval = setInterval(checkQR, 3000);
                     loadServers();
@@ -192,21 +186,16 @@
 
         async function checkQR() {
             try {
-                const res = await fetch(`${API_BASE}/qr`);
+                const res = await fetch(API_BASE + '/qr');
                 const data = await res.json();
-
                 const qrImage = document.getElementById('qr-image');
                 const statusText = document.getElementById('status-text');
                 const logoutBtn = document.getElementById('logout-btn');
 
                 if (data.status === 'connected') {
                     qrImage.style.display = 'none';
-                    
                     let connectedText = '✅ WhatsApp Conectado!';
-                    if (data.user) {
-                        connectedText += `<br><span style="font-size: 13px; font-weight: normal; margin-top: 5px; display: inline-block;">📱 Número: ${data.user}</span>`;
-                    }
-                    
+                    if (data.user) connectedText += `<br><span style="font-size: 13px; font-weight: normal; margin-top: 5px; display: inline-block;">📱 Número: ${data.user}</span>`;
                     statusText.innerHTML = connectedText;
                     statusText.style.color = '#27ae60';
                     logoutBtn.style.display = 'block';
@@ -226,7 +215,6 @@
                     document.getElementById('groups-section').style.display = 'none';
                 }
             } catch (err) {
-                console.error(err);
                 document.getElementById('status-text').innerText = 'Serviço do WhatsApp offline.';
                 document.getElementById('status-text').style.color = '#c0392b';
                 document.getElementById('groups-section').style.display = 'none';
@@ -239,11 +227,9 @@
             document.getElementById('srv-nome-antigo').value = '';
             document.getElementById('srv-provedor').readOnly = false;
             document.getElementById('srv-regiao').readOnly = false;
-            
             document.getElementById('srv-nome').value = '';
             document.getElementById('srv-ip').value = '';
             document.getElementById('srv-link').value = '';
-            
             document.getElementById('modal-add-server').style.display='flex';
         }
 
@@ -251,20 +237,15 @@
             document.getElementById('modal-srv-title').innerText = 'Editar Servidor';
             document.getElementById('srv-acao').value = 'editar';
             document.getElementById('srv-nome-antigo').value = nome;
-            
-            // Impede trocar provedor/região na edição para simplificar lógica
             const provInput = document.getElementById('srv-provedor');
             provInput.value = provedor;
             provInput.readOnly = true;
-            
             const regInput = document.getElementById('srv-regiao');
             regInput.value = regiao;
             regInput.readOnly = true;
-            
             document.getElementById('srv-nome').value = nome;
             document.getElementById('srv-ip').value = ip;
             document.getElementById('srv-link').value = link || '';
-            
             document.getElementById('modal-add-server').style.display='flex';
         }
 
@@ -272,7 +253,7 @@
             const container = document.getElementById('servers-container');
             container.innerHTML = '<div style="text-align:center; padding: 50px; color:#7f8c8d;">Buscando servidores no SAPU...</div>';
             try {
-                const res = await fetch(`${API_BASE}/servidores`, {
+                const res = await fetch(API_BASE + '/servidores', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ acao: 'listar' })
@@ -292,49 +273,50 @@
         function renderServers(data) {
             const container = document.getElementById('servers-container');
             container.innerHTML = '';
-            // Ajustar o background global
-            container.parentElement.style.backgroundColor = '#1e1e1e';
-            container.parentElement.style.color = '#e0e0e0';
+            
+            // Tema Claro Global
+            container.parentElement.style.backgroundColor = '#ecf0f1';
+            container.parentElement.style.color = '#333';
             
             for (const provedor in data) {
                 const providerDiv = document.createElement('div');
-                providerDiv.innerHTML = `<h3 style="margin-bottom: 20px; color: #fff; font-size: 20px; font-weight: normal; border-bottom: 1px solid #333; padding-bottom: 10px;">${provedor}</h3>`;
+                providerDiv.innerHTML = `<h3 style="margin-bottom: 20px; color: #2980b9; font-size: 20px; font-weight: bold; border-bottom: 2px solid #bdc3c7; padding-bottom: 10px;">${provedor}</h3>`;
                 
                 const grid = document.createElement('div');
                 grid.style.display = 'grid';
-                grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(220px, 1fr))';
+                grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(180px, 1fr))';
                 grid.style.gap = '15px';
                 grid.style.marginBottom = '30px';
 
                 for (const regiao in data[provedor]) {
                     const count = data[provedor][regiao].length;
                     
-                    // Cabeçalho da região (ex: NO 145 ativos)
                     const regionTitle = document.createElement('div');
                     regionTitle.style.gridColumn = '1 / -1';
                     regionTitle.style.marginTop = '10px';
-                    regionTitle.innerHTML = `<strong style="color:#fff; font-size:14px; margin-right: 15px;">${regiao}</strong><span style="color:#888; font-size:12px;">${count} servidores</span>`;
+                    regionTitle.innerHTML = `<strong style="color:#2c3e50; font-size:14px; margin-right: 15px;">${regiao}</strong><span style="color:#7f8c8d; font-size:12px;">${count} servidores</span>`;
                     grid.appendChild(regionTitle);
 
                     data[provedor][regiao].forEach(srv => {
+                        const srvLinkSafed = srv.link_grafana ? srv.link_grafana.replace(/'/g, "\\'") : '';
                         const linkGrafanaHTML = srv.link_grafana 
-                            ? `<a href="${srv.link_grafana}" target="_blank" style="color: #27ae60; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px;"><span style="font-size:16px;">📊</span> Abrir Painel</a>` 
-                            : `<span style="color: #555; display: flex; align-items: center; justify-content: center; gap: 5px;"><span style="font-size:16px;">📊</span> Sem link</span>`;
+                            ? `<a href="${srv.link_grafana}" target="_blank" style="color: #27ae60; text-decoration: none; display: flex; align-items: center; justify-content: center; gap: 5px;"><span style="font-size:14px;">📊</span> Abrir Painel</a>` 
+                            : `<span style="color: #95a5a6; display: flex; align-items: center; justify-content: center; gap: 5px;"><span style="font-size:14px;">📊</span> Sem link</span>`;
                         
                         grid.innerHTML += `
-                            <div style="background: #15181a; border: 1px solid #243b55; border-radius: 4px; padding: 20px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 150px; font-family: Arial, sans-serif;">
+                            <div style="position: relative; background: white; border: 1px solid #ddd; border-top: 4px solid #3498db; border-radius: 6px; padding: 15px; text-align: center; display: flex; flex-direction: column; justify-content: space-between; min-height: 120px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); font-family: Arial, sans-serif;">
+                                <span onclick="openEditServerModal('${provedor}', '${regiao}', '${srv.nome}', '${srv.ip}', '${srvLinkSafed}')" style="position: absolute; top: 10px; right: 10px; cursor: pointer; font-size: 14px; opacity: 0.4; transition: opacity 0.2s; color: #000;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.4" title="Editar Servidor">✏️</span>
                                 <div>
-                                    <div style="font-size: 15px; font-weight: bold; color: #fff; margin-bottom: 20px;">${srv.nome}</div>
-                                    <div style="font-size: 13px; color: #aaa; margin-bottom: 15px;">${srv.ip}</div>
+                                    <div style="font-size: 15px; font-weight: bold; color: #2c3e50; margin-bottom: 10px;">${srv.nome}</div>
+                                    <div style="font-size: 13px; color: #7f8c8d; margin-bottom: 10px;">${srv.ip}</div>
                                 </div>
-                                <div style="font-size: 13px; font-weight: bold; padding-top: 15px;">
+                                <div style="font-size: 12px; font-weight: bold; padding-top: 10px; border-top: 1px solid #eee;">
                                     ${linkGrafanaHTML}
                                 </div>
                             </div>
                         `;
                     });
                 }
-                
                 providerDiv.appendChild(grid);
                 container.appendChild(providerDiv);
             }
@@ -347,7 +329,8 @@
             btn.disabled = true;
 
             const payload = {
-                acao: 'adicionar',
+                acao: document.getElementById('srv-acao').value,
+                nome_antigo: document.getElementById('srv-nome-antigo').value,
                 provedor: document.getElementById('srv-provedor').value,
                 regiao: document.getElementById('srv-regiao').value,
                 nome: document.getElementById('srv-nome').value,
@@ -356,15 +339,14 @@
             };
 
             try {
-                const res = await fetch(`${API_BASE}/servidores`, {
+                const res = await fetch(API_BASE + '/servidores', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
                 });
                 const response = await res.json();
-                
                 if (response.status === 'success') {
-                    alert('Servidor adicionado com sucesso no SAPU!');
+                    alert('Operação realizada com sucesso no SAPU!');
                     document.getElementById('modal-add-server').style.display = 'none';
                     renderServers(response.data);
                 } else {
@@ -373,7 +355,6 @@
             } catch (err) {
                 alert('Erro de comunicação.');
             }
-            
             btn.innerText = 'Salvar no SAPU';
             btn.disabled = false;
         });
@@ -383,15 +364,118 @@
             const email = document.getElementById('email').value;
             const senha = document.getElementById('senha').value;
             const errorDiv = document.getElementById('login-error');
+            
             try {
-                const response = await fetch(${API_BASE}/login, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, senha }) });
+                const response = await fetch(API_BASE + '/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, senha })
+                });
                 const data = await response.json();
-                if (data.success) { localStorage.setItem('sapu_email', email); errorDiv.style.display = 'none'; checkAuthState(); } else { errorDiv.innerText = data.error || 'Erro.'; errorDiv.style.display = 'block'; }
-            } catch (err) { errorDiv.style.display = 'block'; }
+                
+                if (data.success) {
+                    localStorage.setItem('sapu_email', email);
+                    errorDiv.style.display = 'none';
+                    checkAuthState();
+                } else {
+                    errorDiv.innerText = data.error || 'E-mail ou senha incorretos.';
+                    errorDiv.style.display = 'block';
+                }
+            } catch (err) {
+                errorDiv.innerText = 'Erro ao conectar no servidor.';
+                errorDiv.style.display = 'block';
+            }
         });
 
-        function logout() { localStorage.removeItem('sapu_email'); checkAuthState(); }
+        function logout() {
+            localStorage.removeItem('sapu_email');
+            checkAuthState();
+        }
+
+        let allGroups = [];
+
+        async function loadGroups() {
+            const listDiv = document.getElementById('groups-list');
+            const searchBox = document.getElementById('search-group');
+            listDiv.style.display = 'block';
+            listDiv.innerHTML = '<div style="text-align: center; padding: 10px;">Carregando...</div>';
+            
+            try {
+                const res = await fetch(API_BASE + '/grupos');
+                const data = await res.json();
+                if (data.groups && data.groups.length > 0) {
+                    allGroups = data.groups;
+                    searchBox.style.display = 'block';
+                    renderGroupsList(allGroups);
+                } else {
+                    listDiv.innerHTML = '<div style="padding: 5px;">Nenhum grupo encontrado.</div>';
+                }
+            } catch (err) {
+                listDiv.innerHTML = '<div style="padding: 5px; color: red;">Erro ao carregar grupos.</div>';
+            }
+        }
+
+        function renderGroupsList(groupsToRender) {
+            const listDiv = document.getElementById('groups-list');
+            if (groupsToRender.length === 0) {
+                listDiv.innerHTML = '<div style="padding: 5px;">Nenhum grupo corresponde à pesquisa.</div>';
+                return;
+            }
+            let html = '';
+            groupsToRender.forEach(g => {
+                html += `
+                    <div style="border-bottom: 1px solid #eee; padding: 8px 0;">
+                        <strong style="color: #2c3e50;">${g.subject}</strong><br>
+                        <button onclick="selectGroup('${g.id}')" style="margin-top: 5px; padding: 4px 8px; font-size: 11px; background: #3498db; color: white; border: none; cursor: pointer; border-radius: 3px;">Selecionar</button>
+                    </div>
+                `;
+            });
+            listDiv.innerHTML = html;
+        }
+
+        function filterGroups() {
+            const term = document.getElementById('search-group').value.toLowerCase();
+            const filtered = allGroups.filter(g => g.subject && g.subject.toLowerCase().includes(term));
+            renderGroupsList(filtered);
+        }
+
+        function selectGroup(groupId) {
+            const url = window.location.origin + '/api/webhook?number=' + encodeURIComponent(groupId);
+            document.getElementById('webhook-url').innerText = url;
+            localStorage.setItem('sapu_group_id', groupId);
+            
+            navigator.clipboard.writeText(url).then(() => {
+                alert('A URL foi atualizada com o ID deste grupo e COPIADA para a área de transferência!');
+            }).catch(err => {
+                alert('URL atualizada! (Seu navegador bloqueou a cópia automática, use o botão Copiar)');
+            });
+        }
+        
+        function copyWebhook() {
+            const url = document.getElementById('webhook-url').innerText;
+            navigator.clipboard.writeText(url).then(() => {
+                alert('URL copiada para a área de transferência!');
+            }).catch(err => {
+                alert('Erro ao copiar URL.');
+            });
+        }
+
+        async function logoutWhatsApp() {
+            if(!confirm('Tem certeza que deseja desconectar o WhatsApp?')) return;
+            try {
+                await fetch(API_BASE + '/logout', { method: 'POST' });
+                document.getElementById('status-text').innerText = 'Desconectando...';
+                setTimeout(checkQR, 2000);
+            } catch (err) {
+                console.error('Erro ao deslogar:', err);
+            }
+        }
+
+        const savedGroupId = localStorage.getItem('sapu_group_id');
+        if (savedGroupId) {
+            document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=' + encodeURIComponent(savedGroupId);
+        }
+        checkAuthState();
     </script>
 </body>
 </html>
-
