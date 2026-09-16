@@ -21,8 +21,8 @@
         .btn-submit:hover { background: #2980b9; }
 
         /* Estilos do Dashboard */
-        .dashboard-container { display: none; flex: 1; overflow: hidden; }
-        .sidebar { width: 300px; background: white; padding: 20px; border-right: 1px solid #ddd; overflow-y: auto; box-shadow: 2px 0 5px rgba(0,0,0,0.05); z-index: 10;}
+        .dashboard-container { display: none; flex: 1; overflow: hidden; position: relative; }
+        .sidebar { width: 300px; background: white; padding: 20px; border-right: 1px solid #ddd; overflow-y: auto; box-shadow: 2px 0 5px rgba(0,0,0,0.05); z-index: 10; transition: left 0.3s ease; }
         .main-content { flex: 1; display: flex; flex-direction: column; }
         .qr-container { text-align: center; margin-top: 20px; padding: 15px; background: #f9f9f9; border-radius: 8px; border: 1px dashed #ccc;}
         #qr-image { max-width: 100%; height: auto; }
@@ -33,11 +33,29 @@
         .webhook-info { background: #e8f4f8; padding: 10px; border-radius: 4px; font-size: 12px; word-break: break-all; border-left: 4px solid #3498db; margin-top:15px;}
         
         #user-info { display: none; }
+
+        /* Menu Hamburguer e Overlay (Mobile) */
+        .menu-toggle { display: none; background: none; border: none; color: white; font-size: 24px; cursor: pointer; padding: 0; margin-right: 15px; }
+        .sidebar-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 9; }
+        
+        @media (max-width: 768px) {
+            .menu-toggle { display: block; }
+            header h1 { font-size: 18px; }
+            header { padding: 10px 15px; }
+            .sidebar { position: fixed; left: -320px; top: 0; height: 100vh; z-index: 100; max-width: 80%; }
+            .sidebar.open { left: 0; }
+            .sidebar-overlay.open { display: block; }
+            .main-content { padding: 10px !important; }
+            #servers-container { gap: 10px !important; }
+        }
     </style>
 </head>
 <body>
     <header>
-        <h1>Monitor de Servidores</h1>
+        <div style="display: flex; align-items: center;">
+            <button class="menu-toggle" onclick="toggleSidebar()">☰</button>
+            <h1>Monitor de Servidores</h1>
+        </div>
         <div id="user-info">
             <span id="user-email" style="margin-right: 15px; font-size: 14px;"></span>
             <button onclick="logout()" class="btn">Sair</button>
@@ -65,7 +83,8 @@
 
     <!-- Tela do Dashboard -->
     <div class="dashboard-container" id="dashboard-view">
-        <div class="sidebar">
+        <div class="sidebar-overlay" id="sidebar-overlay" onclick="toggleSidebar()"></div>
+        <div class="sidebar" id="sidebar">
             <h3 style="margin-top: 0;">WhatsApp (Alertas)</h3>
             <p style="font-size: 14px; color: #666;">Leia o QR Code com seu WhatsApp para ativar o envio de alertas do Grafana.</p>
             
@@ -155,6 +174,11 @@
         const API_BASE = window.location.origin + '/api'; 
         document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=SEU_NUMERO_OU_GRUPO';
         let pollingInterval = null;
+
+        function toggleSidebar() {
+            document.getElementById('sidebar').classList.toggle('open');
+            document.getElementById('sidebar-overlay').classList.toggle('open');
+        }
 
         async function checkAuthState() {
             try {
