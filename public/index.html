@@ -239,7 +239,7 @@
         }
 
         function selectGroup(groupId) {
-            document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=' + groupId;
+            document.getElementById('webhook-url').innerText = window.location.origin + '/api/webhook?number=' + encodeURIComponent(groupId);
             alert('A URL do Webhook foi atualizada com o ID deste grupo!');
         }
 
