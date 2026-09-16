@@ -388,6 +388,11 @@
             const email = document.getElementById('email').value;
             const senha = document.getElementById('senha').value;
             const errorDiv = document.getElementById('login-error');
+            const submitBtn = e.target.querySelector('button[type="submit"]');
+            
+            submitBtn.innerText = 'Entrando... aguarde';
+            submitBtn.disabled = true;
+            errorDiv.style.display = 'none';
             
             try {
                 const response = await fetch(API_BASE + '/login', {
@@ -406,9 +411,12 @@
                     errorDiv.style.display = 'block';
                 }
             } catch (err) {
-                errorDiv.innerText = 'Erro ao conectar no servidor.';
+                errorDiv.innerText = 'Erro ao conectar no servidor interno.';
                 errorDiv.style.display = 'block';
             }
+            
+            submitBtn.innerText = 'Entrar';
+            submitBtn.disabled = false;
         });
 
         function logout() {
